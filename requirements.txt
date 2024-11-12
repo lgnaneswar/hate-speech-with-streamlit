@@ -1,4 +1,4 @@
-streaClit==1.36.0
+streamlit==1.36.0
 pyttsx3==2.90
 tweepy==4.14.0
 numpy==1.26.0
