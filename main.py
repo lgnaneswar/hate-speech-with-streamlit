@@ -6,59 +6,62 @@ from sklearn.model_selection import train_test_split
 from sklearn.tree import DecisionTreeClassifier
 import re
 import nltk
+import pytesseract
+from PIL import Image
 nltk.download('stopwords')
+nltk.download('wordnet')
+nltk.download('omw-1.4')  # Additional resource for WordNet Lemmatizer
 from nltk.corpus import stopwords
+from nltk.stem import WordNetLemmatizer
 import string
 import requests
 
-# Initialize NLTK stemmer and stopwords
-stemmer = nltk.SnowballStemmer("english")
+# Initialize NLTK lemmatizer and stopwords
+lemmatizer = WordNetLemmatizer()
 stopword = set(stopwords.words('english'))
 
-# Function to clean text data
+# Function to clean text data with lemmatization
 def clean(text):
 
     # Convert text to lowercase
     text = str(text).lower()
 
     # Remove square brackets and their contents
-    text = re.sub('\[.*?\]', '', text)
+    text = re.sub(r'\[.*?\]', '', text)
 
     # Remove URLs
-    text = re.sub('https?://\S+|www\.\S+', '', text)
+    text = re.sub(r'https?://\S+|www\.\S+', '', text)
 
     # Remove HTML tags
-    text = re.sub('<.*?>+', '', text)
+    text = re.sub(r'<.*?>+', '', text)
 
     # Remove punctuation
-    text = re.sub('[%s]' % re.escape(string.punctuation), '', text)
+    text = re.sub(rf'[{string.punctuation}]', '', text)
 
     # Remove newline characters
-    text = re.sub('\n', '', text)
+    text = re.sub(r'\n', '', text)
 
     # Remove words containing digits
-    text = re.sub('\w*\d\w*', '', text)
+    text = re.sub(r'\w*\d\w*', '', text)
 
-    # Remove stopwords
-    text = [word for word in text.split(' ') if word not in stopword]
+    # Remove stopwords and apply lemmatization
+    text = [lemmatizer.lemmatize(word) for word in text.split() if word not in stopword]
     text = " ".join(text)
-
-    # Apply stemming
-    text = [stemmer.stem(word) for word in text.split(' ')]
-    text = " ".join(text)
+    
     return text
 
-# Function to call OCR.space API
+# Set up pytesseract path
+pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+
+# Function to extract text from image using pytesseract
 def extract_text(image_file):
-    api_key = 'K89461099688957'
-    endpoint = 'https://api.ocr.space/parse/image'
-    payload = {
-        'apikey': api_key,
-        'language': 'eng',
-    }
-    with open(image_file, 'rb') as file:
-        result = requests.post(endpoint, files={image_file: file}, data=payload)
-        return result.json()
+    # Open the image file
+    image = Image.open(image_file)
+    
+    # Use pytesseract to do OCR on the image
+    text = pytesseract.image_to_string(image)
+    
+    return text
 
 # Load your data from CSV file
 data = pd.read_csv("twitter.csv")
