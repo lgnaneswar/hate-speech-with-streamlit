@@ -5,110 +5,125 @@ import threading
 import tweepy
 from main import clean, clf, cv, extract_text
 
+# Twitter API Bearer Token
+bearer_token = 'AAAAAAAAAAAAAAAAAAAAABGuwwEAAAAAvAn3ByVMr4UIYH9PGBW0OFWFbQk%3DGtO5yRzIjZq8LfYDjggLGbfYCVZbejffleOfii8NDFcKqaWJZD'
+client = tweepy.Client(bearer_token=bearer_token)
 
-# Twitter API credentials
-consumer_key = 'gKb0wDrMVEoFqM3Hz0M3jlNc2'
-consumer_secret = 'KjmBdYKhdwGSrhEqnUU4x12W4yUviZVIWg6LMP3XZolBfCUrsZ'
-access_token = '771677148713144320-zC025J7bzFH8MzQkLEiuHQXSqu7mQaM'
-access_token_secret = 'fsyNWt90MkMlwkjxD6zKfEUZAFLoxrKVtpiYMsBXRy5a0'
+# Set Streamlit page config
+st.set_page_config(page_title="Hate Speech Detection", page_icon="🤫", layout="wide")
 
-# Set up OAuthHandler
-auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
+# CSS for a visually pleasing, dynamic multi-colored background and styling
+st.markdown("""
+    <style>
+        /* Multi-colored animated gradient background */
+        body {
+            background: linear-gradient(45deg, #ff7e5f, #feb47b, #6a82fb, #fc5c7d);
+            background-size: 300% 300%;
+            animation: gradientBG 10s ease infinite;
+            color: #ffffff;
+            font-family: Arial, sans-serif;
+        }
 
-# Set access token
-auth.set_access_token(access_token, access_token_secret)
+        /* Gradient background animation */
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        
+        /* Title styling */
+        .header-title {
+            text-align: center;
+            font-size: 3em;
+            color: #ffffff;
+            margin-bottom: 0.5em;
+            text-shadow: 2px 2px #333333;
+        }
 
-# Create a Tweepy API object
-api = tweepy.API(auth)
+        /* Sidebar styling */
+        .css-1lcbmhc {
+            background-color: rgba(50, 50, 50, 0.8);
+            border-radius: 10px;
+            padding: 1em;
+        }
 
-# Streamlit app title
-st.title("Hate Speech Detection App")
+        /* Button styling */
+        .stButton button {
+            background-color: #ff7e5f;
+            color: white;
+            padding: 0.5em 1.5em;
+            border-radius: 5px;
+            font-size: 1em;
+            font-weight: bold;
+            border: none;
+            transition: 0.3s;
+        }
 
-# Input for choice
-input_choice = st.radio("Select Input Type:", ["Text Input", "Twitter URL", "Upload Image"])
+        /* Button hover effect */
+        .stButton button:hover {
+            background-color: #feb47b;
+            color: #ffffff;
+        }
+        
+    </style>
+    """, unsafe_allow_html=True)
 
-# Function to speak text asynchronously in a separate thread
-def speak_async_thread(text):
-    thread = threading.Thread(target=speak_async, args=(text,))
-    thread.start()
+# Title and description
+st.markdown("<div class='header-title'>🤫 Hate Speech Detection App</div>", unsafe_allow_html=True)
+st.write("### A tool to detect hate speech, offensive language, or neutral content.")
+
+# Sidebar with input options
+st.sidebar.title("🛠️ Options")
+input_choice = st.sidebar.radio("Select Input Type:", ["Text Input", "Twitter URL", "Upload Image"])
+st.sidebar.write("Choose an input type, enter your text, or upload an image to analyze hate speech.")
 
 # Function to speak text asynchronously
 def speak_async(text):
-
-    # Reinitialize the text-to-speech engine each time
     engine = pyttsx3.init()
     engine.say(text)
     engine.runAndWait()
 
+# Function to run speech asynchronously in a thread
+def speak_async_thread(text):
+    threading.Thread(target=speak_async, args=(text,)).start()
+
 def find_verdict(user_input):
-
-    # Clean the user input
     cleaned_input = clean(user_input)
-
-    # Transform the input using the CountVectorizer
     input_data = cv.transform([cleaned_input]).toarray()
-
-    # Predict using the trained model
     verdict = clf.predict(input_data)[0]
-
-    # Display the result
-    st.success(f"Verdict: {verdict}")
-
-    # Convert the verdict to text for speech
-    speech_text = f"The Verdict is {verdict}"
-
-    # Use text-to-speech to say the result asynchronously in a separate thread
-    speak_async_thread(speech_text)
+    st.success(f"**Verdict**: {verdict}")
+    speak_async_thread(f"The Verdict is {verdict}")
 
 # For text input
 if input_choice == 'Text Input':
-    user_input = st.text_area("Enter your text:")
+    user_input = st.text_area("Enter your text:", help="Type text you want to analyze.")
     if st.button("Detect Hate Speech"):
         if user_input:
-
-            #  Find result based on the text retrieved
             find_verdict(user_input)
-
         else:
-
-        # Display a warning if no text is entered
             st.warning("Please enter text before clicking the button.")
 
-# For twitter URL
+# For Twitter URL
 elif input_choice == 'Twitter URL':
-    twitter_url = st.text_input("Enter Twitter URL:", "")
-    if st.button("Detect Hate Speech"):
+    twitter_url = st.text_input("Enter Twitter URL:", help="Paste the URL of the tweet here.")
+    if st.button("Fetch Tweet and Detect"):
         if twitter_url:
             try:
-
-                # Extract tweet content using tweepy
                 tweet_id = twitter_url.split("/")[-1]
-                tweet = api.get_status(tweet_id, tweet_mode="extended")
-                tweet_content = tweet.full_text
-
+                tweet = client.get_tweet(tweet_id, tweet_fields=["text"])
+                tweet_content = tweet.data["text"]
                 find_verdict(tweet_content)
-
-            # Use TweepyException from tweepy.errors
-            except tweepy.errors.TweepyException as e:  
+            except tweepy.TweepyException as e:
                 st.error(f"Error fetching tweet: {str(e)}")
         else:
-
-            # Display a warning if no text is entered
             st.warning("Please enter URL before clicking the button.")
 
 # For image input
 elif input_choice == 'Upload Image':
-
     uploaded_file = st.file_uploader("Upload an image", type=["jpg", "png", "jpeg"])
     if uploaded_file is not None:
-
-        # Display the uploaded image in the Streamlit app
-        st.image(uploaded_file, caption='Uploaded Image', use_column_width=True)
-        if st.button('Detect Hate Speech'):
-
-            # Extract text from the uploaded image using OCR.space API
-            extracted_text = extract_text(uploaded_file.name)
-
-            # Access the parsed results from the OCR API response and retrieve text content
-            user_input = extracted_text['ParsedResults'][0]['ParsedText']
-            find_verdict(user_input)
+        st.image(uploaded_file, caption="Uploaded Image", use_column_width=True)
+        extracted_text = extract_text(uploaded_file)
+        st.write("**Extracted Text:**")
+        st.write(extracted_text)
+        find_verdict(extracted_text)
